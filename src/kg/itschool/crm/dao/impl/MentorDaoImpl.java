@@ -14,12 +14,11 @@ public class MentorDaoImpl implements MentorDao {
 
     public MentorDaoImpl() {
         Connection connection = null;
-        Statement statement = null;
+        PreparedStatement preparedStatement = null;
 
         try {  // api:driver://host:port/database_name
-            System.out.println("Connecting to database...");
+            Log.info(this.getClass().getSimpleName() + " MentorDaoImpl()", Connection.class.getSimpleName(), "Establishing connection");
             connection = getConnection();
-            System.out.println("Connection succeeded.");
 
             String ddlQuery = "CREATE TABLE IF NOT EXISTS tb_mentors(" +
                     "id           BIGSERIAL, " +
@@ -35,16 +34,15 @@ public class MentorDaoImpl implements MentorDao {
                     "CONSTRAINT chk_manager_salary CHECK (salary > MONEY(0))," +
                     "CONSTRAINT chk_manager_first_name CHECK(LENGTH(first_name) > 2));";
 
-            System.out.println("Creating statement...");
-            statement = connection.createStatement();
-            System.out.println("Executing create table statement...");
-            statement.execute(ddlQuery);
+            Log.info(this.getClass().getSimpleName() + " MentorDaoImpl()", PreparedStatement.class.getSimpleName(), "Creating preparedStatement");
+            preparedStatement = connection.prepareStatement(ddlQuery);
+            preparedStatement.execute();
 
         } catch (SQLException e) {
-            System.out.println("Some error occurred");
+            Log.error(this.getClass().getSimpleName() + " MentorDaoImpl()", e.getStackTrace()[0].getClass().getSimpleName(), e.getMessage());
             e.printStackTrace();
         } finally {
-            close(statement);
+            close(preparedStatement);
             close(connection);
         }
     }
@@ -58,12 +56,11 @@ public class MentorDaoImpl implements MentorDao {
         Mentor savedMentor = null;
 
         try {
-            System.out.println("Connecting to database...");
+            Log.info(this.getClass().getSimpleName() + " save()", Connection.class.getSimpleName(), "Establishing connection");
             connection = getConnection();
-            System.out.println("Connection succeeded.");
 
             String createQuery = "INSERT INTO tb_mentors(" +
-                    "last_name, first_name, salary, dob, email) " +
+                    "last_name, first_name, phone_number, salary, date_created, dob, email) " +
 
                     "VALUES(?, ?, ?, MONEY(?), ?, ?, ?)";
 
@@ -97,6 +94,7 @@ public class MentorDaoImpl implements MentorDao {
             savedMentor.setDateCreated(resultSet.getTimestamp("date_created").toLocalDateTime());
 
         } catch (SQLException e) {
+            Log.error(this.getClass().getSimpleName() + " MentorDaoImpl()", e.getStackTrace()[0].getClass().getSimpleName(), e.getMessage());
             e.printStackTrace();
         } finally {
             close(resultSet);
@@ -116,6 +114,7 @@ public class MentorDaoImpl implements MentorDao {
         Mentor mentor = null;
 
         try {
+            Log.info(this.getClass().getSimpleName() + " findById(" + id + ")", Connection.class.getSimpleName(), "Establishing connection");
             connection = getConnection();
 
             String readQuery = "SELECT * FROM tb_mentors WHERE id = ?";
@@ -138,6 +137,7 @@ public class MentorDaoImpl implements MentorDao {
 
 
         } catch (SQLException e) {
+            Log.error(this.getClass().getSimpleName(), e.getStackTrace()[0].getClass().getSimpleName(), e.getMessage());
             e.printStackTrace();
         } finally {
             close(resultSet);
@@ -153,8 +153,8 @@ public class MentorDaoImpl implements MentorDao {
         PreparedStatement preparedStatement = null;
         ResultSet resultSet = null;
 
-        List<Manager> managers = new ArrayList<>();
         List<Mentor> mentors = new ArrayList<>();
+
         try {
             Log.info(this.getClass().getSimpleName() + " findAll()", Connection.class.getSimpleName(), "Establishing connection");
             connection = getConnection();
@@ -171,6 +171,7 @@ public class MentorDaoImpl implements MentorDao {
                 mentor.setFirstName(resultSet.getString("first_name"));
                 mentor.setLastName(resultSet.getString("last_name"));
                 mentor.setEmail(resultSet.getString("email"));
+                mentor.setPhoneNumber(resultSet.getString("phone_number"));
                 mentor.setSalary(Double.valueOf(resultSet.getString("salary").replaceAll("[^\\d\\.]", "")));
                 mentor.setDob(resultSet.getDate("dob").toLocalDate());
                 mentor.setDateCreated(resultSet.getTimestamp("date_created").toLocalDateTime());
@@ -190,6 +191,72 @@ public class MentorDaoImpl implements MentorDao {
 
     @Override
     public List<Mentor> saveAll(List<Mentor> mentors) {
-        return null;
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        List<Mentor> savedMentors = new ArrayList<>();
+
+        try {
+            Log.info(this.getClass().getSimpleName() + " saveAll()", Connection.class.getSimpleName(), "Establishing connection");
+            connection = getConnection();
+
+            String insertQuery = "INSERT INTO tb_mentors(" +
+                    "last_name, first_name, phone_number, salary, date_created, dob, email) " +
+
+                    "VALUES(?, ?, ?, MONEY(?), ?, ?, ?)";
+
+            connection.setAutoCommit(false);
+
+            for (int i = 0; i < mentors.size(); i++) {
+                Mentor mentor = mentors.get(i);
+                preparedStatement = connection.prepareStatement(insertQuery);
+
+                preparedStatement.setString(1, mentor.getLastName());
+                preparedStatement.setString(2, mentor.getFirstName());
+                preparedStatement.setString(3, mentor.getPhoneNumber());
+                preparedStatement.setString(4, (mentor.getSalary() + "").replace(".", ","));
+                preparedStatement.setTimestamp(5, Timestamp.valueOf(mentor.getDateCreated()));
+                preparedStatement.setDate(6, Date.valueOf(mentor.getDob()));
+                preparedStatement.setString(7, mentor.getEmail());
+
+                preparedStatement.addBatch();
+
+                if (i % 20 == 0 || i == mentors.size() - 1) {
+                    preparedStatement.executeBatch();
+                    preparedStatement.clearBatch();
+                }
+            }
+            close(preparedStatement);
+
+            String readQuery = "SELECT * FROM tb_mentors ORDER BY id LIMIT " + mentors.size();
+
+            preparedStatement = connection.prepareStatement(readQuery);
+            resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                Mentor mentor = new Mentor();
+                mentor.setId(resultSet.getLong("Id"));
+                mentor.setLastName(resultSet.getString("last_name"));
+                mentor.setFirstName(resultSet.getString("first_name"));
+                mentor.setPhoneNumber(resultSet.getString("phone_number"));
+                mentor.setSalary(Double.valueOf(resultSet.getString("salary").replaceAll("[^\\d\\.]", "")));
+                mentor.setDateCreated(resultSet.getTimestamp("date_created").toLocalDateTime());
+                mentor.setDob(resultSet.getDate("dob").toLocalDate());
+                mentor.setEmail(resultSet.getString("email"));
+
+                savedMentors.add(mentor);
+            }
+
+
+        } catch (Exception e) {
+            Log.error(this.getClass().getSimpleName(), e.getStackTrace()[0].getClassName(), e.getMessage());
+            e.printStackTrace();
+        } finally {
+            close(resultSet);
+            close(preparedStatement);
+            close(connection);
+        }
+
+        return savedMentors;
     }
 }
