@@ -8,6 +8,7 @@ import kg.itschool.crm.model.Mentor;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class MentorDaoImpl implements MentorDao {
 
@@ -23,7 +24,7 @@ public class MentorDaoImpl implements MentorDao {
             String ddlQuery = "CREATE TABLE IF NOT EXISTS tb_mentors(" +
                     "id           BIGSERIAL, " +
                     "first_name   VARCHAR(50)  NOT NULL, " +
-                    "last_name     VARCHAR(50)  NOT NULL, " +
+                    "last_name     VARCHAR(50) NOT NULL, " +
                     "email        VARCHAR(100) NOT NULL UNIQUE, " +
                     "phone_number CHAR(13)     NOT NULL, " +
                     "salary       MONEY        NOT NULL, " +
@@ -49,7 +50,7 @@ public class MentorDaoImpl implements MentorDao {
     }
 
     @Override
-    public Mentor save(Mentor mentor) {
+    public Optional<Mentor> save(Mentor mentor) {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -102,12 +103,12 @@ public class MentorDaoImpl implements MentorDao {
             close(preparedStatement);
             close(connection);
         }
-        return savedMentor;
+        return Optional.of(savedMentor);
     }
 
 
     @Override
-    public Mentor findById(Long id) {
+    public Optional<Mentor> findById(Long id) {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -136,7 +137,6 @@ public class MentorDaoImpl implements MentorDao {
             mentor.setDateCreated(resultSet.getTimestamp("date_created").toLocalDateTime());
 
 
-
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
@@ -144,7 +144,7 @@ public class MentorDaoImpl implements MentorDao {
             close(preparedStatement);
             close(connection);
         }
-        return mentor;
+        return Optional.of(mentor);
     }
 
     @Override
@@ -154,7 +154,7 @@ public class MentorDaoImpl implements MentorDao {
         ResultSet resultSet = null;
 
         List<Manager> managers = new ArrayList<>();
-List <Mentor> mentors = new ArrayList<>();
+        List<Mentor> mentors = new ArrayList<>();
         try {
             Log.info(this.getClass().getSimpleName() + " findAll()", Connection.class.getSimpleName(), "Establishing connection");
             connection = getConnection();
@@ -185,6 +185,11 @@ List <Mentor> mentors = new ArrayList<>();
             close(preparedStatement);
             close(connection);
         }
+        return null;
+    }
+
+    @Override
+    public List<Mentor> saveAll(List<Mentor> mentors) {
         return null;
     }
 }
